@@ -56,7 +56,7 @@ app.post("/mp4-to-mp3", (req, res) => {
   });
 });
 
-// ✅ ✅ ✅ Route CORRIGÉE pour fusionner plusieurs MP3 (TÉLÉCHARGEMENT + FUSION LOCALE)
+// ✅ ✅ ✅ FUSION MP3 ULTRA ROBUSTE (TÉLÉCHARGEMENT LOCAL VIA FFMPEG)
 app.post("/merge-mp3", async (req, res) => {
   const audioUrls = req.body.audioUrls;
 
@@ -70,13 +70,14 @@ app.post("/merge-mp3", async (req, res) => {
   try {
     const localFiles = [];
 
-    // ✅ 1. Télécharger chaque MP3 dans /tmp
+    // ✅ 1. Télécharger chaque MP3 localement via FFmpeg
     for (let i = 0; i < audioUrls.length; i++) {
       const localPath = `/tmp/audio${i}.mp3`;
 
+      const downloadCmd = `ffmpeg -y -i "${audioUrls[i]}" -acodec copy "${localPath}"`;
+
       await new Promise((resolve, reject) => {
-        const cmd = `curl -L "${audioUrls[i]}" -o "${localPath}"`;
-        exec(cmd, (err) => {
+        exec(downloadCmd, (err) => {
           if (err) reject(err);
           else resolve();
         });
@@ -85,16 +86,16 @@ app.post("/merge-mp3", async (req, res) => {
       localFiles.push(localPath);
     }
 
-    // ✅ 2. Créer le fichier liste pour FFmpeg
+    // ✅ 2. Créer fichier list.txt UNIQUEMENT avec fichiers locaux
     const listFile = "/tmp/list.txt";
     const fileContent = localFiles.map(f => `file '${f}'`).join("\n");
     fs.writeFileSync(listFile, fileContent);
 
-    // ✅ 3. Fusion finale
+    // ✅ 3. Fusion locale finale
     const outputFile = "/tmp/merged.mp3";
-    const ffmpegCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outputFile}"`;
+    const mergeCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outputFile}"`;
 
-    exec(ffmpegCmd, (error, stdout, stderr) => {
+    exec(mergeCmd, (error, stdout, stderr) => {
       if (error) {
         return res.status(500).json({
           success: false,
@@ -105,7 +106,7 @@ app.post("/merge-mp3", async (req, res) => {
 
       res.json({
         success: true,
-        message: "Fusion MP3 terminée avec succès",
+        message: "✅ Fusion MP3 terminée avec succès",
         outputFile: outputFile,
         logs: { stdout, stderr }
       });
