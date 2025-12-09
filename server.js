@@ -32,17 +32,8 @@ app.post("/merge-mp3", async (req, res) => {
     for (let i = 0; i < audioUrls.length; i++) {
       const localPath = `/tmp/audio${i}.mp3`;
 
-      const safeDownloadCmd = `
-        ffmpeg -y 
-        -timeout 20000000 
-        -reconnect 1 
-        -reconnect_streamed 1 
-        -reconnect_delay_max 2 
-        -i "${audioUrls[i]}" 
-        -vn 
-        -acodec libmp3lame 
-        "${localPath}"
-      `;
+      const safeDownloadCmd = `ffmpeg -y -timeout 20000000 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 -i "${audioUrls[i]}" -vn -acodec libmp3lame "${localPath}"`;
+
 
       await new Promise((resolve, reject) => {
         exec(safeDownloadCmd, (err) => err ? reject(err) : resolve());
