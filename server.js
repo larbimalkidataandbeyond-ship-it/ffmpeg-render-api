@@ -47,16 +47,19 @@ app.post("/mp4-to-mp3", (req, res) => {
       });
     }
 
+    const fileBuffer = fs.readFileSync(outputFile);
+    const base64File = fileBuffer.toString("base64");
+
     res.json({
       success: true,
-      message: "Conversion MP3 terminée",
-      outputFile: outputFile,
-      logs: { stdout, stderr }
+      fileName: "output.mp3",
+      mimeType: "audio/mpeg",
+      base64: base64File
     });
   });
 });
 
-// ✅ ✅ ✅ FUSION MP3 ULTRA ROBUSTE (TÉLÉCHARGEMENT LOCAL VIA FFMPEG)
+// ✅ ✅ ✅ FUSION MP3 + ENVOI VERS MAKE EN BASE64
 app.post("/merge-mp3", async (req, res) => {
   const audioUrls = req.body.audioUrls;
 
@@ -73,7 +76,6 @@ app.post("/merge-mp3", async (req, res) => {
     // ✅ 1. Télécharger chaque MP3 localement via FFmpeg
     for (let i = 0; i < audioUrls.length; i++) {
       const localPath = `/tmp/audio${i}.mp3`;
-
       const downloadCmd = `ffmpeg -y -i "${audioUrls[i]}" -acodec copy "${localPath}"`;
 
       await new Promise((resolve, reject) => {
@@ -86,12 +88,12 @@ app.post("/merge-mp3", async (req, res) => {
       localFiles.push(localPath);
     }
 
-    // ✅ 2. Créer fichier list.txt UNIQUEMENT avec fichiers locaux
+    // ✅ 2. Créer le fichier list.txt
     const listFile = "/tmp/list.txt";
     const fileContent = localFiles.map(f => `file '${f}'`).join("\n");
     fs.writeFileSync(listFile, fileContent);
 
-    // ✅ 3. Fusion locale finale
+    // ✅ 3. Fusion locale
     const outputFile = "/tmp/merged.mp3";
     const mergeCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outputFile}"`;
 
@@ -104,11 +106,15 @@ app.post("/merge-mp3", async (req, res) => {
         });
       }
 
+      // ✅ 4. Lire le fichier et l’envoyer en BASE64 à Make
+      const fileBuffer = fs.readFileSync(outputFile);
+      const base64File = fileBuffer.toString("base64");
+
       res.json({
         success: true,
-        message: "✅ Fusion MP3 terminée avec succès",
-        outputFile: outputFile,
-        logs: { stdout, stderr }
+        fileName: "merged.mp3",
+        mimeType: "audio/mpeg",
+        base64: base64File
       });
     });
 
