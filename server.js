@@ -14,7 +14,7 @@ app.get("/ffmpeg-version", (req, res) => {
   });
 });
 
-// ✅ ✅ ✅ FUSION MP3 + URL DE TÉLÉCHARGEMENT
+// ✅ ✅ ✅ FUSION MP3 + TÉLÉCHARGEMENT ROBUSTE + URL DE TÉLÉCHARGEMENT
 app.post("/merge-mp3", async (req, res) => {
   const audioUrls = req.body.audioUrls;
 
@@ -28,19 +28,30 @@ app.post("/merge-mp3", async (req, res) => {
   try {
     const localFiles = [];
 
-    // ✅ 1. Télécharger chaque MP3
+    // ✅ 1. Télécharger chaque MP3 avec protection réseau
     for (let i = 0; i < audioUrls.length; i++) {
       const localPath = `/tmp/audio${i}.mp3`;
-      const cmd = `ffmpeg -y -i "${audioUrls[i]}" -acodec copy "${localPath}"`;
+
+      const safeDownloadCmd = `
+        ffmpeg -y 
+        -timeout 20000000 
+        -reconnect 1 
+        -reconnect_streamed 1 
+        -reconnect_delay_max 2 
+        -i "${audioUrls[i]}" 
+        -vn 
+        -acodec libmp3lame 
+        "${localPath}"
+      `;
 
       await new Promise((resolve, reject) => {
-        exec(cmd, (err) => err ? reject(err) : resolve());
+        exec(safeDownloadCmd, (err) => err ? reject(err) : resolve());
       });
 
       localFiles.push(localPath);
     }
 
-    // ✅ 2. Créer list.txt
+    // ✅ 2. Créer le fichier list.txt (LOCAL UNIQUEMENT)
     const listFile = "/tmp/list.txt";
     const fileContent = localFiles.map(f => `file '${f}'`).join("\n");
     fs.writeFileSync(listFile, fileContent);
@@ -54,7 +65,7 @@ app.post("/merge-mp3", async (req, res) => {
         return res.status(500).json({ success: false, error: error.message });
       }
 
-      // ✅ 4. Générer une URL publique TEMPORAIRE
+      // ✅ 4. Générer une URL temporaire publique
       const fileId = Date.now();
       const publicPath = `/tmp/public_${fileId}.mp3`;
       fs.copyFileSync(outputFile, publicPath);
@@ -73,7 +84,7 @@ app.post("/merge-mp3", async (req, res) => {
   }
 });
 
-// ✅ ✅ ✅ Route de téléchargement (Make va l’utiliser)
+// ✅ ✅ ✅ Route de téléchargement public
 app.get("/download/:id", (req, res) => {
   const filePath = `/tmp/public_${req.params.id}.mp3`;
 
@@ -86,3 +97,4 @@ app.get("/download/:id", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("✅ FFmpeg API running on port " + PORT));
+
